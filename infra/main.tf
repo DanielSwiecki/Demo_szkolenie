@@ -17,7 +17,6 @@ resource "docker_container" "app" {
   name  = "green-app-staging"
   image = "${var.image_name}:${var.tag}"
 
-  # Wewnętrznie aplikacja słucha na 5000, na hoście otwieramy 3001 (opcjonalnie)
   ports {
     internal = 5000
     external = 3001
