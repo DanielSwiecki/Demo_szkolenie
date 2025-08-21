@@ -9,7 +9,7 @@ pipeline {
       steps {
         checkout scm
         script {
-          env.SHORT_SHA    = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+          env.SHORT_SHA     = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
           env.ACTUAL_BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
           echo "Branch: ${env.ACTUAL_BRANCH}, Commit: ${env.SHORT_SHA}"
         }
@@ -90,7 +90,7 @@ pipeline {
           PROD_HEALTH=$(curl -fsS http://localhost:3000/health || echo "FAIL")
           PROD_ROOT=$(curl -fsS http://localhost:3000/ || echo "FAIL")
 
-          # Zbuduj prosty raport HTML
+          # Zbuduj prosty raport HTML (HEREDOC – bez interpolacji)
           cat > report/index.html << "HTML"
           <!doctype html>
           <html lang="en"><meta charset="utf-8">
@@ -98,8 +98,6 @@ pipeline {
           <style>
             body{font-family:system-ui,Arial,sans-serif;margin:24px}
             h1{margin:0 0 12px}
-            .ok{color:green;font-weight:bold}
-            .fail{color:#b00020;font-weight:bold}
             code,pre{background:#f6f8fa;padding:4px 6px;border-radius:6px}
             table{border-collapse:collapse;margin-top:12px}
             td,th{border:1px solid #ddd;padding:8px}
@@ -124,12 +122,12 @@ pipeline {
           </body></html>
           HTML
 
-          # Podmień placeholdery wartościami
-          sed -i "s/__SHORT_SHA__/${SHORT_SHA}/" report/index.html
-          sed -i "s|__STAGING_HEALTH__|${STAGING_HEALTH}|" report/index.html
-          sed -i "s|__STAGING_ROOT__|${STAGING_ROOT}|" report/index.html
-          sed -i "s|__PROD_HEALTH__|${PROD_HEALTH}|" report/index.html
-          sed -i "s|__PROD_ROOT__|${PROD_ROOT}|" report/index.html
+          # Podmień placeholdery wartościami (używamy zmiennych powłoki)
+          sed -i "s/__SHORT_SHA__/$SHORT_SHA/" report/index.html
+          sed -i "s|__STAGING_HEALTH__|$STAGING_HEALTH|" report/index.html
+          sed -i "s|__STAGING_ROOT__|$STAGING_ROOT|" report/index.html
+          sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
+          sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
         '''
         archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
         echo "Raport zapisany jako artefakt: report/index.html"
