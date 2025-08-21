@@ -82,9 +82,10 @@ mkdir -p report
 STAGING_HEALTH=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health || echo "FAIL")
 STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo "FAIL")
 
-# PROD (host:3000)
-PROD_HEALTH=$(curl -fsS http://localhost:3000/health || echo "FAIL")
-PROD_ROOT=$(curl -fsS http://localhost:3000/ || echo "FAIL")
+# PROD (hostowy port 3000) — UŻYJ sieci hosta
+PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
+PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
+
 
 # Zbuduj raport HTML (UWAGA: znacznik 'HTML' w kolumnie 1)
 cat > report/index.html <<'HTML'
