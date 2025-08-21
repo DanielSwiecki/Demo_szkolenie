@@ -12,7 +12,7 @@ pipeline {
         checkout scm
         script {
           env.SHORT_SHA = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-          env.ACTUAL_BRANCH = env.BRANCH_NAME ?: sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
+          env.ACTUAL_BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
           echo "Branch: ${env.ACTUAL_BRANCH}, Commit: ${env.SHORT_SHA}"
         }
       }
@@ -35,7 +35,7 @@ pipeline {
         script {
           catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
             sh """
-              docker run --rm -v "$PWD":/workspace -w /workspace node:20-alpine \
+              docker run --rm -v "${WORKSPACE}":/workspace -w /workspace node:20-alpine \
                 /bin/sh -lc 'node -v && (npm ci || npm install) && npm test'
             """
           }
@@ -54,7 +54,6 @@ pipeline {
     }
 
     stage('Integration (staging via Terraform)') {
-      when { branch 'main' }
       steps {
         sh """
           set -e
@@ -69,7 +68,6 @@ pipeline {
     }
 
     stage('Deploy to PROD (Docker)') {
-      when { branch 'main' }
       steps {
         sh '''
           docker rm -f green-app-prod || true
