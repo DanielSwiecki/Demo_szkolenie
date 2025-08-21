@@ -1,8 +1,8 @@
-FROM node:20-alpine
+FROM python:3.11-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
-ENV NODE_ENV=production
-EXPOSE 3000
-CMD ["npm","start"]
+EXPOSE 5000
+CMD ["python","app.py"]

@@ -13,12 +13,14 @@ resource "docker_network" "green_net" {
   name = "green_net"
 }
 
+# Staging: kontener z aplikacją na porcie 5000 (wewnątrz)
 resource "docker_container" "app" {
   name  = "green-app-staging"
   image = "${var.image_name}:${var.tag}"
 
+  # wystaw na hoście inny port, np. 3001 (opcjonalnie)
   ports {
-    internal = 3000
+    internal = 5000
     external = 3001
   }
 
