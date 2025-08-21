@@ -1,9 +1,11 @@
 pipeline {
   agent any
   options { timestamps() }
+
   environment {
     IMAGE_NAME = "green-app"
   }
+
   stages {
     stage('Checkout') {
       steps {
@@ -16,14 +18,26 @@ pipeline {
       }
     }
 
-      stage('Unit Tests (Node via Docker)') {
-    steps {
-      sh '''
-        docker run --rm -v "$PWD":/workspace -w /workspace node:20-alpine sh -lc "node -v && (npm ci || npm install) && npm test"
-      '''
+    stage('Workspace sanity check') {
+      steps {
+        sh '''
+          echo "== WORKSPACE =="
+          pwd
+          ls -la
+          echo "== infra =="
+          ls -la infra || true
+        '''
+      }
     }
-  }
 
+    stage('Unit Tests (Node via Docker)') {
+      steps {
+        sh '''
+          docker run --rm -v "$PWD":/workspace -w /workspace node:20-alpine \
+            sh -lc "node -v && (npm ci || npm install) && npm test"
+        '''
+      }
+    }
 
     stage('Build Docker Image') {
       steps {
@@ -35,23 +49,24 @@ pipeline {
       }
     }
 
-   stage('Integration (staging via Terraform)') {
-  when { branch 'main' }
-  steps {
-    sh '''
-      cd infra
-      terraform init -input=false
-      terraform apply -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA}
+    stage('Integration (staging via Terraform)') {
+      when { branch 'main' }
+      steps {
+        sh '''
+          set -e
+          cd infra
+          terraform init -input=false
+          terraform apply -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA}
 
-      # krótki wait na start
-      sleep 3
+          # krótki wait na start kontenera staging
+          sleep 3
 
-      # Sprawdzamy /health "od środka" tej samej sieci dockerowej
-      docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:3000/health
-    '''
-  }
-}
-
+          # Sprawdzamy /health "od środka" tej samej sieci dockerowej
+          docker run --rm --network=green_net curlimages/curl:8.8.0 \
+            -fsS http://green-app-staging:3000/health
+        '''
+      }
+    }
 
     stage('Deploy to PROD (Docker)') {
       when { branch 'main' }
@@ -67,8 +82,12 @@ pipeline {
   post {
     always {
       sh '''
-        cd infra || exit 0
-        terraform destroy -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA} || true
+        if [ -d infra ]; then
+          cd infra
+          # dla pewności zainicjalizuj, by lockfile był spójny
+          terraform init -input=false || true
+          terraform destroy -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA} || true
+        fi
       '''
     }
   }
