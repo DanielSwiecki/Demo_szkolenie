@@ -2,9 +2,7 @@ pipeline {
   agent any
   options { timestamps() }
 
-  environment {
-    IMAGE_NAME = "green-app"
-  }
+  environment { IMAGE_NAME = "green-app" }
 
   stages {
     stage('Checkout') {
@@ -30,11 +28,11 @@ pipeline {
     stage('Unit Tests (Python via Docker) - fail-open') {
       steps {
         script {
-          // Prosty test: Python działa, Flask zainstaluje się w obrazie podczas builda
+          // prościutki test: Python działa; jak się wywali -> UNSTABLE, ale pipeline idzie dalej
           catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
             sh """
               docker run --rm -v "${WORKSPACE}":/workspace -w /workspace python:3.11-alpine \
-                /bin/sh -lc 'python --version && python -c "print(\\"unit ok\\")"'
+                /bin/sh -lc 'python --version && python -c "print(\\\"unit ok\\\")"'
             """
           }
         }
@@ -58,9 +56,7 @@ pipeline {
           cd infra
           terraform init -input=false
           terraform apply -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA}
-          # krótki wait na start
           sleep 5
-          # Sprawdzamy /health wewnątrz tej samej sieci dockerowej
           docker run --rm --network=green_net curlimages/curl:8.8.0 \
             -fsS http://green-app-staging:5000/health
         """
@@ -71,7 +67,6 @@ pipeline {
       steps {
         sh '''
           docker rm -f green-app-prod || true
-          # mapujemy host:3000 -> container:5000
           docker run -d --name green-app-prod -p 3000:5000 ${IMAGE_NAME}:${SHORT_SHA}
           docker ps
         '''
