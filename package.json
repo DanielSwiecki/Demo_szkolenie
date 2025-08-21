@@ -1,0 +1,13 @@
+{
+  "name": "green-app",
+  "version": "1.0.0",
+  "description": "Minimalna aplikacja do szkolenia Green DevOps (CI/CD + Docker + Jenkins + Terraform).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node -e \"console.log('unit ok')\""
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
