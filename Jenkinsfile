@@ -76,6 +76,7 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
       steps {
         sh '''
 set -e
+set -e
 mkdir -p report
 
 # STAGING (w sieci green_net)
@@ -86,8 +87,22 @@ STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS ht
 PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
 PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
 
+# ====== DOCKER STATS (CPU/Mem/IO) – BEZPIECZNIE ======
+# Niech pojedyncza awaria nie przerwie etapu (na chwilę zdejmujemy -e)
+set +e
+STATS_STAGING_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-staging 2>/dev/null)
+[ -n "$STATS_STAGING_RAW" ] || STATS_STAGING_RAW="green-app-staging\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A"
 
-# Zbuduj raport HTML (UWAGA: znacznik 'HTML' w kolumnie 1)
+STATS_PROD_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-prod 2>/dev/null)
+[ -n "$STATS_PROD_RAW" ] || STATS_PROD_RAW="green-app-prod\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A"
+set -e
+
+# Zamień taby na " | " i zescape’uj HTML
+to_html() { sed -e "s/&/\\&amp;/g" -e "s/</\\&lt;/g" -e "s/>/\\&gt;/g" -e "s/\\t/ | /g"; }
+STATS_STAGING=$(echo "$STATS_STAGING_RAW" | to_html)
+STATS_PROD=$(echo "$STATS_PROD_RAW" | to_html)
+
+# Zbuduj raport HTML
 cat > report/index.html <<'HTML'
 <!doctype html>
 <html lang="en"><meta charset="utf-8">
@@ -116,6 +131,13 @@ cat > report/index.html <<'HTML'
   <tr><td>/health</td><td>__PROD_HEALTH__</td></tr>
   <tr><td>/</td><td><pre>__PROD_ROOT__</pre></td></tr>
 </table>
+
+<h2>Container Stats (docker stats)</h2>
+<table>
+  <tr><th>Env</th><th>NAME</th><th>CPU%</th><th>MemUsage</th><th>Mem%</th><th>Net I/O</th><th>Block I/O</th><th>PIDs</th></tr>
+  <tr><td>staging</td><td colspan="7"><pre>__STATS_STAGING__</pre></td></tr>
+  <tr><td>prod</td><td colspan="7"><pre>__STATS_PROD__</pre></td></tr>
+</table>
 </body></html>
 HTML
 
@@ -125,6 +147,9 @@ sed -i "s|__STAGING_HEALTH__|$STAGING_HEALTH|" report/index.html
 sed -i "s|__STAGING_ROOT__|$STAGING_ROOT|" report/index.html
 sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
 sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
+sed -i "s|__STATS_STAGING__|$STATS_STAGING|" report/index.html
+sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
+''' -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
 '''
         archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
         echo "Raport zapisany jako artefakt: report/index.html"
