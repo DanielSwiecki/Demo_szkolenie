@@ -50,7 +50,9 @@ docker images | head -n 10
 
     stage('Integration (staging via Terraform)') {
       steps {
-        sh """
+        script {
+          catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+            sh """
 set -e
 cd infra
 terraform init -input=false
@@ -58,23 +60,31 @@ terraform apply -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA
 sleep 6
 docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health
 """
+          }
+        }
       }
     }
 
     stage('Deploy to PROD (Docker)') {
       steps {
-        sh '''
+        script {
+          catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+            sh '''
 docker rm -f green-app-prod || true
 docker run -d --name green-app-prod -p 3000:5000 ${IMAGE_NAME}:${SHORT_SHA}
 sleep 6
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 '''
+          }
+        }
       }
     }
 
     stage('Smoke Tests & Report') {
       steps {
-        sh '''
+        script {
+          catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+            sh '''
 set -e
 STAGE_START_TS=$(date +%s)
 mkdir -p report
@@ -83,11 +93,11 @@ mkdir -p report
 STAGING_HEALTH=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health || echo "FAIL")
 STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo "FAIL")
 
-# ===== Smoke: PROD (port hosta 3000) – sieć hosta =====
+# ===== Smoke: PROD (port hosta 3000) – sieć hosta (Play-with-Docker/Jenkins w kontenerze) =====
 PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
 PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
 
-# ===== Docker stats (CPU/Mem/IO) z bezpiecznymi fallbackami =====
+# ===== Docker stats (CPU/Mem/IO) – z bezpiecznymi fallbackami =====
 set +e
 docker ps --format "{{.Names}}" | grep -wq green-app-staging
 STAGING_EXISTS=$?
@@ -175,8 +185,10 @@ sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
 sed -i "s|__STAGE_DURATION__|$STAGE_DURATION|" report/index.html
 sed -i "s|__DOCKER_SIZE__|$DOCKER_SIZE|" report/index.html
 '''
-        archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
-        echo "Raport zapisany jako artefakt: report/index.html"
+            archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
+            echo "Raport zapisany jako artefakt: report/index.html"
+          }
+        }
       }
     }
   }
