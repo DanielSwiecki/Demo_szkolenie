@@ -73,8 +73,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     }
 
     stage('Smoke Tests & Report') {
-  steps {
-    sh '''
+      steps {
+        sh '''
 set -e
 mkdir -p report
 
@@ -82,7 +82,7 @@ mkdir -p report
 STAGING_HEALTH=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health || echo "FAIL")
 STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo "FAIL")
 
-# PROD (hostowy port 3000) — sieć hosta, żeby localhost:3000 był widoczny
+# PROD (hostowy port 3000) — UŻYJ sieci hosta
 PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
 PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
 
@@ -109,7 +109,7 @@ cat > report/index.html <<'HTML'
 <style>
   body{font-family:system-ui,Arial,sans-serif;margin:24px}
   h1{margin:0 0 12px}
-  code,pre{background:#f6f8fa;padding:6px 8px;border-radius:6px;display:block;white-space:pre-wrap}
+  code,pre{background:#f6f8fa;padding:4px 6px;border-radius:6px}
   table{border-collapse:collapse;margin-top:12px}
   td,th{border:1px solid #ddd;padding:8px}
 </style>
@@ -157,11 +157,11 @@ sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
 sed -i "s|__BUILD_TIME__|$BUILD_TIME|" report/index.html
 sed -i "s|__DOCKER_SIZE__|$DOCKER_SIZE|" report/index.html
 '''
-    archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
-    echo "Raport zapisany jako artefakt: report/index.html"
+        archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
+        echo "Raport zapisany jako artefakt: report/index.html"
+      }
+    }
   }
-}
-
 
   post {
     always {
