@@ -1,6 +1,6 @@
 variable "image_name" {
   type    = string
-  default = "green-app"  
+  default = "green-app"
 }
 
 variable "tag" {
