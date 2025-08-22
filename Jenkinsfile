@@ -6,7 +6,6 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      when { branch 'main' }  
       steps {
         checkout scm
         script {
