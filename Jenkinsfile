@@ -76,7 +76,6 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
       steps {
         sh '''
 set -e
-set -e
 mkdir -p report
 
 # STAGING (w sieci green_net)
@@ -149,7 +148,6 @@ sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
 sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
 sed -i "s|__STATS_STAGING__|$STATS_STAGING|" report/index.html
 sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
-''' -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
 '''
         archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
         echo "Raport zapisany jako artefakt: report/index.html"
