@@ -19,10 +19,7 @@ resource "docker_container" "app" {
   name  = "green-app-staging"
   image = "${var.image_name}:${var.tag}"
 
-  ports {
-    internal = 5000
-    external = 3001
-  }
+    ports { internal = 5000, external = 3001 }
 
   networks_advanced {
     name = docker_network.green_net.name
