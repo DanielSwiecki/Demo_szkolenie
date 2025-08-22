@@ -73,8 +73,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     }
 
     stage('Smoke Tests & Report') {
-  steps {
-    sh '''
+      steps {
+        sh '''
 set -e
 STAGE_START_TS=$(date +%s)
 mkdir -p report
@@ -174,9 +174,10 @@ sed -i "s|__DOCKER_SIZE__|$DOCKER_SIZE|" report/index.html
 '''
     archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
     echo "Raport zapisany jako artefakt: report/index.html"
+      }
+    }
   }
-}
-
+  
 
   post {
     always {
