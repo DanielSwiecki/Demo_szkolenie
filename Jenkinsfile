@@ -140,14 +140,13 @@ cat > report/index.html <<'HTML'
 </body></html>
 HTML
 
-# Podmień placeholdery
-sed -i "s/__SHORT_SHA__/$SHORT_SHA/" report/index.html
-sed -i "s|__STAGING_HEALTH__|$STAGING_HEALTH|" report/index.html
-sed -i "s|__STAGING_ROOT__|$STAGING_ROOT|" report/index.html
-sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
-sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
-sed -i "s|__STATS_STAGING__|$STATS_STAGING|" report/index.html
-sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
+sed -i "s#__SHORT_SHA__#$SHORT_SHA#" report/index.html
+sed -i "s#__STAGING_HEALTH__#$(printf '%s' "$STAGING_HEALTH" | sed 's/[&]/\\&/g')#" report/index.html
+sed -i "s#__STAGING_ROOT__#$(printf '%s' "$STAGING_ROOT" | sed 's/[&]/\\&/g')#" report/index.html
+sed -i "s#__PROD_HEALTH__#$(printf '%s' "$PROD_HEALTH" | sed 's/[&]/\\&/g')#" report/index.html
+sed -i "s#__PROD_ROOT__#$(printf '%s' "$PROD_ROOT" | sed 's/[&]/\\&/g')#" report/index.html
+sed -i "s#__STATS_STAGING__#$(printf '%s' "$STATS_STAGING" | sed 's/[&]/\\&/g')#" report/index.html
+sed -i "s#__STATS_PROD__#$(printf '%s' "$STATS_PROD" | sed 's/[&]/\\&/g')#" report/index.html
 '''
         archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
         echo "Raport zapisany jako artefakt: report/index.html"
