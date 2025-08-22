@@ -7,7 +7,7 @@ terraform {
   }
 }
 
-provider "docker" {}            # TODO: nazwa providera
+provider "docker" {}          
 
 resource "docker_network" "green_net" {
   name = "green_net"

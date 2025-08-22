@@ -2,11 +2,11 @@ pipeline {
   agent any
   options { timestamps() }
 
-  environment { IMAGE_NAME = "green-app" }   // uzupełnij"
+  environment { IMAGE_NAME = "green-app" }   
 
   stages {
     stage('Checkout') {
-      when { branch '__FILL__' }  //TODO : w głownej gałezi
+      when { branch 'main' }  
       steps {
         checkout scm
         script {
@@ -20,7 +20,7 @@ pipeline {
     stage('Build (Docker)') {
       steps {
         sh '''
-          docker build -t ${IMAGE_NAME}:${SHORT_SHA} . //czegoś tutaj brakuje
+          docker build -t ${IMAGE_NAME}:${SHORT_SHA} . 
           docker tag ${IMAGE_NAME}:${SHORT_SHA} ${IMAGE_NAME}:latest
           docker images | head -n 10
         '''
@@ -64,8 +64,8 @@ pipeline {
           STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo FAIL)
 
           # prod przez hostowy port 3000 (ważne: sieć hosta!)
-          PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo FAIL)  # TODO
-          PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo FAIL)          # TODO
+          PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo FAIL)  
+          PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo FAIL)          
 
           # raport (heredoc – tag kończy się w kolumnie 1!)
           cp report_template.html report/index.html
