@@ -2,13 +2,12 @@ pipeline {
   agent any
   options { timestamps() }
 
-  environment { IMAGE_NAME = "__FILL__" }   // uzupełnij"
+  environment { IMAGE_NAME = "green-app" }   // uzupełnij"
 
   stages {
     stage('Checkout') {
       steps {
-        // TODO: pobierz kod z repo SCM
-        checkout __FILL__  
+        checkout scm
         script {
           env.SHORT_SHA     = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
           env.ACTUAL_BRANCH = sh(returnStdout: true, script: 'git rev-parse --abbrev-ref HEAD').trim()
@@ -20,7 +19,7 @@ pipeline {
     stage('Build (Docker)') {
       steps {
         sh '''
-          docker __FILL__ -t ${IMAGE_NAME}:${SHORT_SHA} . //czegoś tutaj brakuje
+          docker build -t ${IMAGE_NAME}:${SHORT_SHA} . //czegoś tutaj brakuje
           docker tag ${IMAGE_NAME}:${SHORT_SHA} ${IMAGE_NAME}:latest
           docker images | head -n 10
         '''
@@ -32,9 +31,9 @@ pipeline {
         sh """
           set -e
           cd infra
-          terraform __FILL__ -input=false                       // TODO:
-          terraform __FILL__ -auto-approve \
-            -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA}  // TODO: 
+          terraform init -input=false                      
+          terraform apply -auto-approve \
+            -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA} 
           sleep 6
           docker run --rm --network=green_net curlimages/curl:8.8.0 \
             -fsS http://green-app-staging:5000/health
@@ -64,8 +63,8 @@ pipeline {
           STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo FAIL)
 
           # prod przez hostowy port 3000 (ważne: sieć hosta!)
-          PROD_HEALTH=$(docker run --rm --network=__FILL__ curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo FAIL)  # TODO
-          PROD_ROOT=$(docker run --rm --network=__FILL__ curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo FAIL)          # TODO
+          PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo FAIL)  # TODO
+          PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo FAIL)          # TODO
 
           # raport (heredoc – tag kończy się w kolumnie 1!)
           cp report_template.html report/index.html

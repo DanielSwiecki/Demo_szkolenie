@@ -1,6 +1,6 @@
 variable "image_name" {
   type    = string
-  default = "__FILL__"    # uzupełnij
+  default = "green-app"    # uzupełnij
 }
 
 variable "tag" {

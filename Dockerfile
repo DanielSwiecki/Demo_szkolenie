@@ -1,4 +1,4 @@
-FROM python:3.11-__FILL__        # uzupełnij
+FROM python:3.11-alpine       
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY requirements.txt .
