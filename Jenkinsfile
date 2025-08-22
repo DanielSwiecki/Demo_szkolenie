@@ -6,6 +6,7 @@ pipeline {
 
   stages {
     stage('Checkout') {
+      when { branch '__FILL__' }  //TODO : w głownej gałezi
       steps {
         // TODO: pobierz kod z repo SCM
         checkout __FILL__  
