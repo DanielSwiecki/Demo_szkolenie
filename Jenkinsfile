@@ -76,47 +76,29 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
       steps {
         sh '''
 set -e
-STAGE_START_TS=$(date +%s)
 mkdir -p report
 
-# ===== Smoke: STAGING (ta sama sieć dockerowa) =====
+# STAGING (w sieci green_net)
 STAGING_HEALTH=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health || echo "FAIL")
 STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo "FAIL")
 
-# ===== Smoke: PROD (port hosta 3000) – sieć hosta =====
+# PROD (hostowy port 3000) — UŻYJ sieci hosta
 PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
 PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
 
-# ===== Docker stats (CPU/Mem/IO) z bezpiecznymi fallbackami =====
-set +e
-docker ps --format "{{.Names}}" | grep -wq green-app-staging
-STAGING_EXISTS=$?
-docker ps --format "{{.Names}}" | grep -wq green-app-prod
-PROD_EXISTS=$?
+# ===== Docker stats (CPU/Mem/IO) =====
+# surowe statystyki (jednorazowe pobranie)
+STATS_STAGING_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-staging || true)
+STATS_PROD_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-prod || true)
 
-if [ $STAGING_EXISTS -eq 0 ]; then
-  STATS_STAGING_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-staging 2>/dev/null)
-else
-  STATS_STAGING_RAW="green-app-staging\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A"
-fi
-
-if [ $PROD_EXISTS -eq 0 ]; then
-  STATS_PROD_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-prod 2>/dev/null)
-else
-  STATS_PROD_RAW="green-app-prod\tN/A\tN/A\tN/A\tN/A\tN/A\tN/A"
-fi
-set -e
-
+# helper: zamień znaki specjalne na HTML i \t -> " | ", oraz dodaj <br/> na końcu każdej linii
 to_html() { sed -e "s/&/\\&amp;/g" -e "s/</\\&lt;/g" -e "s/>/\\&gt;/g" -e "s/\\t/ | /g" -e "s/$/<br\\/>/"; }
+
 STATS_STAGING=$(echo "$STATS_STAGING_RAW" | to_html)
 STATS_PROD=$(echo "$STATS_PROD_RAW" | to_html)
 
-DOCKER_SIZE=$(docker images --format "{{.Repository}}:{{.Tag}} -> {{.Size}}" | grep -m1 ${IMAGE_NAME}:${SHORT_SHA} || echo "N/A")
 
-STAGE_END_TS=$(date +%s)
-STAGE_DURATION=$((STAGE_END_TS - STAGE_START_TS))
-
-# ===== Raport HTML =====
+# Zbuduj raport HTML (UWAGA: znacznik 'HTML' w kolumnie 1)
 cat > report/index.html <<'HTML'
 <!doctype html>
 <html lang="en"><meta charset="utf-8">
@@ -124,7 +106,7 @@ cat > report/index.html <<'HTML'
 <style>
   body{font-family:system-ui,Arial,sans-serif;margin:24px}
   h1{margin:0 0 12px}
-  code,pre{background:#f6f8fa;padding:6px 8px;border-radius:6px;display:block;white-space:pre-wrap}
+  code,pre{background:#f6f8fa;padding:4px 6px;border-radius:6px}
   table{border-collapse:collapse;margin-top:12px}
   td,th{border:1px solid #ddd;padding:8px}
 </style>
@@ -153,11 +135,6 @@ cat > report/index.html <<'HTML'
 <h3>Production (green-app-prod)</h3>
 <pre>NAME | CPU% | MemUsage | Mem% | Net I/O | Block I/O | PIDs<br/>__STATS_PROD__</pre>
 
-<h2>Build/Stage Stats</h2>
-<table>
-  <tr><th>Stage Duration (s)</th><td>__STAGE_DURATION__</td></tr>
-  <tr><th>Docker Image</th><td><code>__DOCKER_SIZE__</code></td></tr>
-</table>
 </body></html>
 HTML
 
@@ -169,14 +146,25 @@ sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
 sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
 sed -i "s|__STATS_STAGING__|$STATS_STAGING|" report/index.html
 sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
-sed -i "s|__STAGE_DURATION__|$STAGE_DURATION|" report/index.html
-sed -i "s|__DOCKER_SIZE__|$DOCKER_SIZE|" report/index.html
 '''
-    archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
-    echo "Raport zapisany jako artefakt: report/index.html"
+        archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
+        echo "Raport zapisany jako artefakt: report/index.html"
       }
     }
   }
+
+  post {
+    always {
+      sh '''
+if [ -d infra ]; then
+  cd infra
+  terraform init -input=false || true
+  terraform destroy -auto-approve -var image_name=${IMAGE_NAME} -var tag=${SHORT_SHA} || true
+fi
+'''
+    }
+  }
+}
   
 
   post {
