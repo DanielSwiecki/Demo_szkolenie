@@ -73,8 +73,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     }
 
     stage('Smoke Tests & Report') {
-      steps {
-        sh '''
+  steps {
+    sh '''
 set -e
 mkdir -p report
 
@@ -82,10 +82,24 @@ mkdir -p report
 STAGING_HEALTH=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/health || echo "FAIL")
 STAGING_ROOT=$(docker run --rm --network=green_net curlimages/curl:8.8.0 -fsS http://green-app-staging:5000/ || echo "FAIL")
 
-# PROD (hostowy port 3000) — UŻYJ sieci hosta
+# PROD (hostowy port 3000) — sieć hosta, żeby localhost:3000 był widoczny
 PROD_HEALTH=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/health || echo "FAIL")
 PROD_ROOT=$(docker run --rm --network=host curlimages/curl:8.8.0 -fsS http://localhost:3000/ || echo "FAIL")
 
+# ===== Docker stats (CPU/Mem/IO) =====
+# surowe statystyki (jednorazowe pobranie)
+STATS_STAGING_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-staging || true)
+STATS_PROD_RAW=$(docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}" green-app-prod || true)
+
+# helper: zamień znaki specjalne na HTML i \t -> " | ", oraz dodaj <br/> na końcu każdej linii
+to_html() { sed -e "s/&/\\&amp;/g" -e "s/</\\&lt;/g" -e "s/>/\\&gt;/g" -e "s/\\t/ | /g" -e "s/$/<br\\/>/"; }
+
+STATS_STAGING=$(echo "$STATS_STAGING_RAW" | to_html)
+STATS_PROD=$(echo "$STATS_PROD_RAW" | to_html)
+
+# (opcjonalnie) rozmiar obrazu + czas builda
+DOCKER_SIZE=$(docker images --format "{{.Repository}}:{{.Tag}} -> {{.Size}}" | grep ${IMAGE_NAME}:${SHORT_SHA} || echo "N/A")
+BUILD_TIME=$(expr $(date +%s) - $(($(printf "%s" ${currentBuild.startTimeInMillis})/1000)) 2>/dev/null || echo "N/A")
 
 # Zbuduj raport HTML (UWAGA: znacznik 'HTML' w kolumnie 1)
 cat > report/index.html <<'HTML'
@@ -95,7 +109,7 @@ cat > report/index.html <<'HTML'
 <style>
   body{font-family:system-ui,Arial,sans-serif;margin:24px}
   h1{margin:0 0 12px}
-  code,pre{background:#f6f8fa;padding:4px 6px;border-radius:6px}
+  code,pre{background:#f6f8fa;padding:6px 8px;border-radius:6px;display:block;white-space:pre-wrap}
   table{border-collapse:collapse;margin-top:12px}
   td,th{border:1px solid #ddd;padding:8px}
 </style>
@@ -116,6 +130,19 @@ cat > report/index.html <<'HTML'
   <tr><td>/health</td><td>__PROD_HEALTH__</td></tr>
   <tr><td>/</td><td><pre>__PROD_ROOT__</pre></td></tr>
 </table>
+
+<h2>Container Stats (docker stats)</h2>
+<h3>Staging (green-app-staging)</h3>
+<pre>NAME | CPU% | MemUsage | Mem% | Net I/O | Block I/O | PIDs<br/>__STATS_STAGING__</pre>
+
+<h3>Production (green-app-prod)</h3>
+<pre>NAME | CPU% | MemUsage | Mem% | Net I/O | Block I/O | PIDs<br/>__STATS_PROD__</pre>
+
+<h2>Build Stats</h2>
+<table>
+  <tr><th>Build Time (s)</th><td>__BUILD_TIME__</td></tr>
+  <tr><th>Docker Image</th><td><code>__DOCKER_SIZE__</code></td></tr>
+</table>
 </body></html>
 HTML
 
@@ -125,12 +152,16 @@ sed -i "s|__STAGING_HEALTH__|$STAGING_HEALTH|" report/index.html
 sed -i "s|__STAGING_ROOT__|$STAGING_ROOT|" report/index.html
 sed -i "s|__PROD_HEALTH__|$PROD_HEALTH|" report/index.html
 sed -i "s|__PROD_ROOT__|$PROD_ROOT|" report/index.html
+sed -i "s|__STATS_STAGING__|$STATS_STAGING|" report/index.html
+sed -i "s|__STATS_PROD__|$STATS_PROD|" report/index.html
+sed -i "s|__BUILD_TIME__|$BUILD_TIME|" report/index.html
+sed -i "s|__DOCKER_SIZE__|$DOCKER_SIZE|" report/index.html
 '''
-        archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
-        echo "Raport zapisany jako artefakt: report/index.html"
-      }
-    }
+    archiveArtifacts artifacts: 'report/**', fingerprint: true, onlyIfSuccessful: false
+    echo "Raport zapisany jako artefakt: report/index.html"
   }
+}
+
 
   post {
     always {
